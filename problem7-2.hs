@@ -26,23 +26,50 @@ main = do
 
 possibleThrusts :: [([Phase], Int)]
 possibleThrusts = do
-  phases <- permutations $ Phase <$> [0 .. 4]
-  let (Input thrust) = runAmplifierSequence phases
+  phases <- permutations $ Phase <$> [5 .. 9]
+  let (Input thrust, _) = execSequence phases
   pure (phases, thrust)
 
-runAmplifierSequence :: [Phase] -> Input
-runAmplifierSequence phases =
-  foldl' (flip runAmplifier) (Input 0) phases
 
+execSequence :: [Phase] -> SequenceState
+execSequence phases = head finished
+  where
+    sequenceState0 = (Input 0, startAmplifier <$> phases)
+    (running, finished) = break isFinished $ iterate runSequence sequenceState0
+
+isFinished :: SequenceState -> Bool
+isFinished (_, states) = (status $ last states) == Halted
+
+type SequenceState = (Input, [State])
+
+runSequence :: SequenceState -> SequenceState
+runSequence (input, states) = (output, states')
+  where
+    states' = runAmplifierSequence input states []
+    output = getOutput $ last states'
+
+
+runAmplifierSequence :: Input -> [State] -> [State] -> [State]
+runAmplifierSequence input toRun finished =
+  case toRun of
+    [] -> finished
+    (state : toRun') -> runAmplifierSequence output toRun' (finished <> [state'])
+      where
+        state' = runAmplifier state input
+        output = getOutput state'
+
+getOutput :: State -> Input
+getOutput (State {outputs}) = Input $ head outputs
 
 newtype Phase = Phase Int deriving (Show)
 newtype Input = Input Int deriving (Show)
 
-runAmplifier :: Phase -> Input -> Input
-runAmplifier (Phase phase) (Input input) = Input $ head outputs
-  where
-    state0 = State {pc=0, mem=program, status=Running, inputs=[phase, input], outputs=[]}
-    State {outputs} = execState state0
+startAmplifier :: Phase -> State
+startAmplifier (Phase phase) =
+  execState $ State {pc=0, mem=program, status=Running, inputs=[phase], outputs=[]}
+
+runAmplifier :: State -> Input -> State
+runAmplifier state0 (Input input) = execState $ provideInput input $ state0
 
 execState :: State -> State
 execState state0 = stateF
@@ -52,6 +79,13 @@ execState state0 = stateF
 
 isRunning :: State -> Bool
 isRunning (State {status}) = status == Running
+
+provideInput :: Int -> State -> State
+provideInput i s@(State {inputs, status}) = s {inputs=inputs <> [i], status=status'}
+  where
+    status' = case status of
+      WaitingForInput -> Running
+      _ -> status
 
 step :: State -> State
 step s@(State {pc, mem, status}) =
