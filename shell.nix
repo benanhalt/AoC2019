@@ -3,5 +3,9 @@
 with pkgs;
 
 mkShell {
-  buildInputs = [ ghc ];
+  buildInputs = [
+    ghc
+    hlint
+    haskellPackages.hindent
+  ];
 }
