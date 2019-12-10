@@ -46,25 +46,25 @@ state0 program inputs = State
 execState :: State -> State
 execState state0 = stateF
   where
-    (running, notRunning) = break (not . isRunning) $ iterate step state0
+    (running, notRunning) = span isRunning $ iterate step state0
     stateF = head notRunning
 
 isRunning :: State -> Bool
-isRunning (State {status}) = status == Running
+isRunning State {status} = status == Running
 
 provideInput :: Integer -> State -> State
-provideInput i s@(State {inputs, status}) = s {inputs=inputs <> [i], status=status'}
+provideInput i s@State {inputs, status} = s {inputs=inputs <> [i], status=status'}
   where
     status' = case status of
       WaitingForInput -> Running
       _ -> status
 
 getOutput :: State -> [Integer]
-getOutput (State {outputs}) = reverse outputs
+getOutput State {outputs} = reverse outputs
 
 
 step :: State -> State
-step s@(State {pc, mem, status}) =
+step s@State {pc, mem, status} =
   case status of
     Running ->
       case decodeOp $ mem !!! pc of
@@ -88,7 +88,7 @@ decodeOp i = (OpCode opCode, ModeCode <$> modeCodes)
     modeCodes = fmap (`rem` 10) $ iterate (`div` 10) $ i `div` 100
 
 readOperand :: [ModeCode] -> Int -> State -> Integer
-readOperand modes i (State {pc, mem, relBase}) =
+readOperand modes i State {pc, mem, relBase} =
   case modes !! i of
     ModeCode 0 -> mem !!! val  -- position mode
     ModeCode 1 -> val          -- immediate mode
@@ -97,7 +97,7 @@ readOperand modes i (State {pc, mem, relBase}) =
     val = mem !!! (pc + 1 + toInteger i)
 
 writeOperand :: [ModeCode] -> Int -> Integer -> State -> Mem
-writeOperand modes i val s@(State {pc, mem, relBase}) = Map.insert k val mem
+writeOperand modes i val s@State {pc, mem, relBase} = Map.insert k val mem
   where
     j = mem !!! (pc + 1 + toInteger i)
     k = case modes !! i of
@@ -105,21 +105,21 @@ writeOperand modes i val s@(State {pc, mem, relBase}) = Map.insert k val mem
       ModeCode 2 -> j + relBase -- relative mode
 
 addOp :: [ModeCode] -> State -> State
-addOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
+addOp modes s@State {pc, mem} = s {pc=pc + 4, mem=mem'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
     mem' = writeOperand modes 2 (a + b) s
 
 multOp :: [ModeCode] -> State -> State
-multOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
+multOp modes s@State {pc, mem} = s {pc=pc + 4, mem=mem'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
     mem' = writeOperand modes 2 (a * b) s
 
 inOp :: [ModeCode] -> State -> State
-inOp modes s@(State {pc, mem, inputs}) =
+inOp modes s@State {pc, mem, inputs} =
   case inputs of
     [] -> s {status = WaitingForInput}
     _ -> s {pc=pc + 2, mem=mem', inputs=tail inputs}
@@ -128,26 +128,26 @@ inOp modes s@(State {pc, mem, inputs}) =
         mem' = writeOperand modes 0 input s
 
 outOp :: [ModeCode] -> State -> State
-outOp modes s@(State {pc, mem, outputs}) = s {pc=pc + 2, outputs=(a : outputs)}
+outOp modes s@State {pc, mem, outputs} = s {pc=pc + 2, outputs=a : outputs}
   where
     a = readOperand modes 0 s
 
 jmpIfTrueOp :: [ModeCode] -> State -> State
-jmpIfTrueOp modes s@(State {pc, mem}) = s {pc=pc'}
+jmpIfTrueOp modes s@State {pc, mem} = s {pc=pc'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
     pc' = if a == 0 then pc + 3 else b
 
 jmpIfFalseOp :: [ModeCode] -> State -> State
-jmpIfFalseOp modes s@(State {pc, mem}) = s {pc=pc'}
+jmpIfFalseOp modes s@State {pc, mem} = s {pc=pc'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
     pc' = if a == 0 then b else pc + 3
 
 ltOp :: [ModeCode] -> State -> State
-ltOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
+ltOp modes s@State {pc, mem} = s {pc=pc + 4, mem=mem'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
@@ -155,7 +155,7 @@ ltOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
     mem' = writeOperand modes 2 lt s
 
 eqOp :: [ModeCode] -> State -> State
-eqOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
+eqOp modes s@State {pc, mem} = s {pc=pc + 4, mem=mem'}
   where
     a = readOperand modes 0 s
     b = readOperand modes 1 s
@@ -163,6 +163,6 @@ eqOp modes s@(State {pc, mem}) = s {pc=pc + 4, mem=mem'}
     mem' = writeOperand modes 2 eq s
 
 adjRelBaseOp :: [ModeCode] -> State -> State
-adjRelBaseOp modes s@(State {pc, relBase}) = s {pc=pc + 2, relBase=relBase + a}
+adjRelBaseOp modes s@State {pc, relBase} = s {pc=pc + 2, relBase=relBase + a}
   where
     a = readOperand modes 0 s
