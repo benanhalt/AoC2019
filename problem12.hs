@@ -1,22 +1,26 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, DeriveGeneric #-}
 
 import Data.List (iterate')
+import Control.DeepSeq (NFData, deepseq)
+import GHC.Generics (Generic)
 
 data Moon = Moon
   { position :: [Int]
   , velocity :: [Int]
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic)
 
+instance NFData Moon
 
 gravity :: Moon -> Moon -> Moon
 gravity Moon{position = a} affected@Moon{position = b, velocity} =
-  affected {velocity = zipWith (+) velocity (signum <$> zipWith (-) a b)}
+  affected {velocity = zipWith (\a b -> a + b) velocity (signum <$> zipWith (-) a b)}
 
 allGravity :: [Moon] -> [Moon]
 allGravity moons = flip (foldr gravity) moons <$> moons
 
 updatePosition :: Moon -> Moon
-updatePosition moon@Moon{position, velocity} = moon {position = zipWith (+) velocity position}
+updatePosition moon@Moon{position, velocity} =
+  moon `deepseq` moon {position = zipWith (+) position velocity}
 
 step :: [Moon] -> [Moon]
 step moons = updatePosition <$> allGravity moons
@@ -46,14 +50,13 @@ exampleMoons = initMoon <$>
   , (3, 5, -1)
   ]
 
-simulate :: [Moon] -> [Moon] -> Int -> Int
-simulate init !moons !count =
-  if moons == init
-  then count
-  else simulate init (step moons) (count + 1)
+simulate :: [[Moon]] -> [[Moon]]
+simulate (moons:past) =
+  if elem moons past
+  then past
+  else simulate (step moons : moons : past)
 
 main :: IO ()
 main = do
-  print $ sum $ energy <$> (iterate step givenMoons !! 10)
-  print $ simulate givenMoons (step givenMoons) 1
-
+  print $ sum $ energy <$> (iterate step givenMoons !! 1000)
+  print $ length $ simulate [exampleMoons]
