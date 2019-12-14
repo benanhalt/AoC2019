@@ -1,13 +1,14 @@
-{-# LANGUAGE NamedFieldPuns, DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns, DeriveGeneric, BangPatterns #-}
 
 import Data.List (iterate')
+import qualified Data.Set as Set
 import Control.DeepSeq (NFData, deepseq)
 import GHC.Generics (Generic)
 
 data Moon = Moon
   { position :: [Int]
   , velocity :: [Int]
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Ord, Generic)
 
 instance NFData Moon
 
@@ -50,13 +51,14 @@ exampleMoons = initMoon <$>
   , (3, 5, -1)
   ]
 
-simulate :: [[Moon]] -> [[Moon]]
-simulate (moons:past) =
-  if elem moons past
+simulate :: [Moon] -> Set.Set [Moon] -> Set.Set [Moon]
+simulate moons past =
+  past `deepseq`
+  if Set.member moons past
   then past
-  else simulate (step moons : moons : past)
+  else simulate (step moons) $ Set.insert moons past
 
 main :: IO ()
 main = do
   print $ sum $ energy <$> (iterate step givenMoons !! 1000)
-  print $ length $ simulate [exampleMoons]
+  print $ Set.size $ simulate givenMoons Set.empty
