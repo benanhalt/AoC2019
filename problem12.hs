@@ -51,14 +51,21 @@ exampleMoons = initMoon <$>
   , (3, 5, -1)
   ]
 
-simulate :: [Moon] -> Set.Set [Moon] -> Set.Set [Moon]
-simulate moons past =
-  past `deepseq`
-  if Set.member moons past
-  then past
-  else simulate (step moons) $ Set.insert moons past
+-- find cycles in each dimension separately.
+
+extractDim :: Int -> [Moon] -> [(Int, Int)]
+extractDim i moons = (\Moon {position, velocity} -> (position !! i, velocity !! i)) <$> moons
+
+simulate :: Int -> [Moon] -> [Moon] -> Int -> Int
+simulate dim initSystem system cycleLength =
+  if extractDim dim system == extractDim dim initSystem
+  then cycleLength
+  else simulate dim initSystem (step system) (cycleLength + 1)
 
 main :: IO ()
 main = do
   print $ sum $ energy <$> (iterate step givenMoons !! 1000)
-  print $ Set.size $ simulate givenMoons Set.empty
+  let cycles = (\i -> simulate i givenMoons (step givenMoons) 1) <$> [0..2]
+  print $ cycles
+  print $ foldl lcm 1 cycles
+
