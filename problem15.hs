@@ -15,12 +15,6 @@ type Room = Map.Map (Integer, Integer) RoomContent
 data Direction = North | South | West | East
   deriving (Eq, Show, Enum)
 
-instance Read Direction where
-  readsPrec _ "," = [(North, "")]
-  readsPrec _ "a" = [(West, "")]
-  readsPrec _ "o" = [(South, "")]
-  readsPrec _ "e" = [(East, "")]
-
 inputFromDir :: Direction -> Integer
 inputFromDir = (+ 1) . toInteger . fromEnum
 
@@ -33,25 +27,59 @@ outputToResp = toEnum . fromInteger
 data Droid = Droid
   { computer :: State
   , position :: (Integer, Integer)
+  , direction :: Direction
   , room :: Room
   }
 
 droid0 :: Droid
-droid0 = Droid {computer = state0 program [], room = Map.singleton (0,0) Empty, position = (0,0)}
+droid0 = Droid {computer = state0 program [], room = Map.singleton (0,0) Empty, position = (0,0), direction = North}
 
 main :: IO ()
 main = runDroid droid0
 
 
 stepDroid :: Direction -> Droid -> Droid
-stepDroid dir droid@Droid {computer, room, position} =
-  droid {computer = clearOutput computer', room = room', position = position'}
+stepDroid dir droid@Droid {computer, room, position, direction} =
+  droid {computer = clearOutput computer', room = room', position = position', direction = direction'}
   where
     input = inputFromDir dir
     computer' = execState $ provideInput input computer
     resp = outputToResp $ head $ getOutput computer'
     room' = updateRoom position dir resp room
     position' = updatePosition dir resp position
+    direction' = if position' == position then direction else dir
+
+runDroid :: Droid -> IO ()
+runDroid droid@Droid {computer, room, position} = do
+  putStrLn "\x1B[H\x1B[J"
+  printRoom position room
+  threadDelay 10000
+
+  let dir = chooseDirection droid
+  runDroid $ stepDroid dir droid
+
+chooseDirection :: Droid -> Direction
+chooseDirection droid =
+  case direction droid of
+    dir | look (rightOf dir) droid /= Just Wall -> rightOf dir
+        | look dir droid /= Just Wall -> dir
+        | look (leftOf dir) droid /= Just Wall -> leftOf dir
+        | otherwise -> rightOf $ rightOf dir
+
+rightOf :: Direction -> Direction
+rightOf North = East
+rightOf East = South
+rightOf South = West
+rightOf West = North
+
+leftOf :: Direction -> Direction
+leftOf d = iterate rightOf d !! 3
+
+
+look :: Direction -> Droid -> Maybe RoomContent
+look dir Droid {room, position} =
+  Map.lookup (updatePosition dir Moved position) room
+
 
 updateRoom :: (Integer, Integer) -> Direction -> DroidResponse -> Room -> Room
 updateRoom position dir resp = Map.insert position' content
@@ -69,13 +97,6 @@ updatePosition dir _ (x, y) = case dir of
   South -> (x, y+1)
   West -> (x-1, y)
   East -> (x+1, y)
-
-runDroid :: Droid -> IO ()
-runDroid droid@Droid {computer, room, position} = do
-  putStrLn "\x1B[H\x1B[J"
-  printRoom position room
-  input <- getLine
-  runDroid $ stepDroid (read input) droid
 
 
 printRoom :: (Integer, Integer) -> Room -> IO ()
