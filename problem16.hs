@@ -9,15 +9,23 @@ input = "59708372326282850478374632294363143285591907230244898069506559289353324
 main :: IO ()
 main = do
   print $ take 8 $ fft 100 input
---   print $ part2 input
+  print $ part2 input
 
 
 part2 :: String -> String
-part2 input = take 8 $ fft 1 input'
-  --take 8 $ drop offset $ fft 100 input'
+part2 input = concat $ show <$> (take 8 $ drop offset $ fft)
   where
-    -- offset = read $ take 7 input
-    input' = concat $ take 10000 $ repeat input
+    input' = concat $ take 5000 $ repeat $ (read . pure) <$> input
+    fft = iterate phase' input' !! 100
+    offset = read (take 7 input) - 5000 * length input
+
+phase' :: [Int] -> [Int]
+phase' [] = []
+phase' (x:xs) = (x + y) `mod` 10 : ys
+  where
+    ys = phase' xs
+    y = if null ys then 0 else head ys
+
 
 fft :: Int -> String -> String
 fft n s = concat $ show <$> V.toList (iterate' phase input !! n)
@@ -32,8 +40,8 @@ phaseElement input pos = (`mod` 10) $ abs $ V.ifoldl' (\a i inp -> a + inp * bas
   where
     base = [0, 1, 0, -1]
 
--- pattern' :: Int -> Int -> V.Vector Int
--- pattern' l n = V.generate l generator
---   where
---     generator i = base !! ((i+1) `div` n `mod` 4)
---     base = [0, 1, 0, -1]
+pattern' :: Int -> Int -> V.Vector Int
+pattern' l n = V.generate l generator
+  where
+    generator i = base !! ((i+1) `div` n `mod` 4)
+    base = [0, 1, 0, -1]
