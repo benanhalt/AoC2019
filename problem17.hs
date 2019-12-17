@@ -3,24 +3,38 @@
 import Prelude hiding (Left, Right)
 import Control.Monad (guard)
 import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt)
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, isNothing, listToMaybe)
 import Data.Char (chr)
 import qualified Data.Map.Strict as Map
 import Control.Concurrent (threadDelay)
 import qualified Data.Set as Set
 
+type Grid = [[Char]]
+
+data Dir = F | L | R deriving (Eq, Show)
+
+newtype Pos = Pos {unPos :: (Int, Int)} deriving (Eq, Show)
+newtype Step = Step {unStep :: (Int, Int)} deriving (Eq, Show)
+
 main :: IO ()
 main = do
   let map = (chr . fromInteger) <$> (getOutput $ execState $ state0 program [])
   putStrLn $ map
-  let xs = findIntersections $ map2grid map
+  let grid = map2grid map
+  let xs = findIntersections grid
   print $ xs
-  print $ sum $ (uncurry (*)) <$> xs
+  print $ sum $ (uncurry (*) . unPos) <$> xs
+  let [bot] = findBot grid
+  print $ bot
+  let path = unfoldr (fmap (\(d,p,dp) -> (d, (p,dp))) . stepBot grid) (bot, Step (0,-1))
+  print $ path
+  print $ length path
 
-map2grid :: String -> [[Char]]
-map2grid = reverse . tail . reverse . lines
 
-findIntersections :: [[Char]] -> [(Integer, Integer)]
+map2grid :: String -> Grid
+map2grid = init . lines
+
+findIntersections :: Grid -> [Pos]
 findIntersections grid = do
   y <- [1 .. (length grid - 2)]
   x <- [1 .. (length (head grid) - 2)]
@@ -31,9 +45,41 @@ findIntersections grid = do
     , grid !! y !! (x-1)
     , grid !! y !! (x+1)
     ]
-  pure (toInteger x, toInteger y)
+  pure $ Pos (x, y)
 
 
+findBot :: Grid -> [Pos]
+findBot grid = do
+  y <- [1 .. (length grid - 2)]
+  x <- [1 .. (length (head grid) - 2)]
+  guard $ elem (grid !! y !! x) ['<', '>', '^', 'v']
+  pure $ Pos (x, y)
+
+look :: Grid -> Pos -> Maybe Char
+look grid (Pos (x,y))
+  | y >= length grid = Nothing
+  | y < 0 = Nothing
+  | x >= length (head grid) = Nothing
+  | x < 0 = Nothing
+  | otherwise = Just $ grid !! y !! x
+
+updateDir :: Step ->  Dir -> Step
+updateDir (Step (dx, dy)) dir = Step $ case dir of
+  F -> (dx, dy)
+  L -> (dy, -dx)
+  R -> (-dy, dx)
+
+updatePos :: Pos -> Step -> Pos
+updatePos (Pos (x,y)) (Step (dx, dy)) = Pos (x+dx, y+dy)
+
+stepBot :: Grid -> (Pos, Step) -> Maybe (Dir, Pos, Step)
+stepBot grid (p, dp) =
+  listToMaybe $ do
+    d <- [F, L, R]
+    let dp' = updateDir dp d
+    let p' = updatePos p dp'
+    guard $ look grid p' == Just '#'
+    pure (d, if d == F then p' else p, dp')
 
 type Mem = Map.Map Integer Integer
 
