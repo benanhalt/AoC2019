@@ -1,11 +1,21 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ nixpkgs ? import <nixpkgs> {} }:
+let
+  inherit (nixpkgs) pkgs;
+  inherit (pkgs) haskellPackages;
 
-with pkgs;
+  haskellDeps = ps: with ps; [
+    base
+    vector
+  ];
 
-mkShell {
-  buildInputs = [
+  ghc = haskellPackages.ghcWithPackages haskellDeps;
+
+  nixPackages = [
     ghc
-    hlint
     haskellPackages.hindent
   ];
+in
+pkgs.stdenv.mkDerivation {
+  name = "env";
+  buildInputs = nixPackages;
 }

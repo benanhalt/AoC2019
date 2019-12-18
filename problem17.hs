@@ -2,19 +2,21 @@
 
 import Prelude hiding (Left, Right)
 import Control.Monad (guard)
-import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt)
+import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt, intercalate)
 import Data.Maybe (fromMaybe, isNothing, listToMaybe)
-import Data.Char (chr)
+import Data.Char (chr, ord)
 import qualified Data.Map.Strict as Map
 import Control.Concurrent (threadDelay)
-import qualified Data.Set as Set
 
 type Grid = [[Char]]
 
-data Dir = F | L | R deriving (Eq, Show)
+data Dir = F | L | R deriving (Eq, Show, Ord)
 
 newtype Pos = Pos {unPos :: (Int, Int)} deriving (Eq, Show)
 newtype Step = Step {unStep :: (Int, Int)} deriving (Eq, Show)
+
+
+
 
 main :: IO ()
 main = do
@@ -23,13 +25,38 @@ main = do
   let grid = map2grid map
   let xs = findIntersections grid
   print $ xs
+  putStrLn "\nPart 1:"
   print $ sum $ (uncurry (*) . unPos) <$> xs
+
   let [bot] = findBot grid
   print $ bot
   let path = unfoldr (fmap (\(d,p,dp) -> (d, (p,dp))) . stepBot grid) (bot, Step (0,-1))
   print $ path
-  print $ length path
+  print $ path2code path
 
+-- By Inspection
+
+  let a = "L,12,R,4,R,4,L,6"
+  let b = "L,12,R,4,R,4,R,12"
+  let c = "L,10,L,6,R,4"
+  let main = "A,B,A,C,A,B,C,B,C,A"
+
+  let program' = 2 : drop 1 program
+  let inputs = (toInteger . ord) <$> intercalate "\n" [main, a, b, c, "n", "\n"]
+
+  let outputs = getOutput $ execState $ state0 program' inputs
+  putStrLn $ (chr . fromInteger) <$> (init outputs)
+
+  putStrLn "\nPart 2:"
+  print $ last outputs
+
+path2code :: [Dir] -> String
+path2code path = intercalate "," $ unfoldr generate path
+  where
+    generate [] = Nothing
+    generate p@(F : _) = Just (show $ length fs, rest)
+      where (fs, rest) = span (== F) p
+    generate (lr : rest) = Just (show lr, rest)
 
 map2grid :: String -> Grid
 map2grid = init . lines
