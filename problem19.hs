@@ -1,18 +1,12 @@
 {-# LANGUAGE NamedFieldPuns, ScopedTypeVariables #-}
 
 import Prelude hiding (Left, Right)
-import Control.Monad (guard)
+import Control.Monad (forM_, guard)
 import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt, intercalate)
 import Data.Maybe (fromMaybe, isNothing, listToMaybe)
 import Data.Char (chr, ord)
 import qualified Data.Map.Strict as Map
 import Control.Concurrent (threadDelay)
-
-type Grid = [[Char]]
-
-
-
-
 
 main :: IO ()
 main = do
@@ -24,6 +18,31 @@ main = do
   putStrLn "Part 1:"
   print $ sum results
 
+  -- forM_ results $ print
+
+  let (x,y) = head $ solve 100
+  print (x,y)
+  putStrLn "Part 2:"
+  print $ x*10000 + y
+
+
+inBeam :: Integer -> Integer -> Bool
+inBeam x y
+  | x < 0 = False
+  | y < 0 = False
+  | otherwise = (getOutput $ execState $ state0 program [x, y]) == [1]
+
+
+solve :: Integer -> [(Integer, Integer)]
+solve size = do
+  (x,y) <- traceUpperEdge 3 4 -- The beam is broken at the beginning!
+  guard $ inBeam (x-size+1) (y+size-1)
+  pure (x-size+1,y)
+
+traceUpperEdge :: Integer -> Integer -> [(Integer, Integer)]
+traceUpperEdge x y
+  | inBeam (x+1) y  = traceUpperEdge (x+1) y
+  | otherwise = (x,y) : traceUpperEdge x (y+1)
 
 
 type Mem = Map.Map Integer Integer
