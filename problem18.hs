@@ -1,40 +1,208 @@
+{-# LANGUAGE NamedFieldPuns, ScopedTypeVariables #-}
 
 import Control.Monad
+import Control.DeepSeq
+import Data.Char
+import Data.Maybe
+import Debug.Trace
+import Data.List
+import qualified Data.Set as S
+import qualified Data.Vector.Unboxed as V
 
-type Grid = [[Char]]
+data Grid = Grid
+  { cols :: Int
+  , rows :: Int
+  , chars :: V.Vector Char
+  }
+
+data Queue a = Queue Int [a] [a] deriving Show
+
+checkf :: Queue a -> Queue a
+checkf (Queue i [] r) = Queue i (reverse r) []
+checkf q = q
+
+snoc :: a -> Queue a -> Queue a
+snoc x (Queue i f r) = checkf $ Queue (i+1) f (x:r)
+
+isEmpty :: Queue a -> Bool
+isEmpty (Queue _ f _) = null f
+
+empty :: Queue a
+empty = Queue 0 [] []
+
+front :: Queue a -> a
+front (Queue _ f r) = head f
+
+rest :: Queue a -> Queue a
+rest (Queue i (x:xs) r) = checkf $ Queue (i-1) xs r
+
+size :: Queue a -> Int
+size (Queue i _ _) = i
 
 
-
-
-newtype Pos = Pos {unPos :: (Int, Int)} deriving (Eq, Show)
-newtype Step = Step {unStep :: (Int, Int)} deriving (Eq, Show)
+newtype Pos = Pos {unPos :: (Int, Int)} deriving (Eq, Show, Ord)
 
 data State = State
   { pos :: Pos
-  , keys :: []
-  } deriving (Show)
+  , keys :: S.Set Char
+  , steps :: Int
+  } deriving (Show, Eq, Ord)
 
+
+main :: IO ()
+main =
+  let
+    grid = parseGrid input
+    allKeys = findKeys grid
+    botPos = head $ findBot grid
+    s = State {pos = botPos, keys = S.empty, steps=0}
+    q =  s `snoc` empty
+  in
+    print $ search grid allKeys q S.empty
+
+
+parseGrid :: [[Char]] -> Grid
+parseGrid cs =
+  let
+    rows = length cs
+    cols = length $ head cs
+  in
+    Grid {rows = rows, cols = cols, chars = V.concat $ V.fromList <$> cs}
+
+
+search :: Grid -> S.Set Char -> Queue State -> S.Set (Pos, S.Set Char) -> State
+search grid allKeys q seen =
+  let
+    s@State {keys, pos, steps} = front q
+    Just c = look grid pos
+    keys' = if isLower c then S.insert c keys else keys
+    seen' = S.insert (pos, keys') seen
+    newStates = do
+      let Pos (x,y) = pos
+      pos' <- [(x-1, y), (x, y-1), (x+1, y), (x, y+1)]
+      guard $ not $ S.member (Pos pos', keys') seen'
+      let s' = State {pos = Pos pos', keys=keys', steps=steps+1}
+      guard $ isGood grid s'
+      pure s'
+    q' = foldl' (flip snoc) (rest q) newStates
+  in
+    if keys' == allKeys then s
+    else search grid allKeys q' seen'
+
+
+isGood :: Grid -> State -> Bool
+isGood grid State {keys, pos} =
+  case look grid pos of
+    Nothing -> False
+    Just '#' -> False
+    Just '.' -> True
+    Just '@' -> True
+    Just c -> isLower c || (isUpper c && toLower c `S.member` keys)
+
+findKeys :: Grid -> S.Set Char
+findKeys grid@Grid {rows, cols, chars} = S.fromList $ do
+  y <- [0 .. rows-1]
+  x <- [0 .. cols-1]
+  c <- maybeToList $ look grid (Pos (x,y))
+  guard $ isLower c
+  pure $ c
 
 findBot :: Grid -> [Pos]
-findBot grid = do
-  y <- [1 .. (length grid - 2)]
-  x <- [1 .. (length (head grid) - 2)]
+findBot grid@Grid {rows, cols} = do
+  y <- [0 .. (rows-1)]
+  x <- [0 .. (cols-1)]
   guard $ look grid (Pos (x,y)) == Just '@'
   pure $ Pos (x, y)
 
 look :: Grid -> Pos -> Maybe Char
-look grid (Pos (x,y))
-  | y >= length grid = Nothing
+look Grid {rows, cols, chars} (Pos (x,y))
+  | y >= rows = Nothing
   | y < 0 = Nothing
-  | x >= length (head grid) = Nothing
+  | x >= cols = Nothing
   | x < 0 = Nothing
-  | otherwise = Just $ grid !! y !! x
-
-updatePos :: Pos -> Step -> Pos
-updatePos (Pos (x,y)) (Step (dx, dy)) = Pos (x+dx, y+dy)
+  | otherwise = Just $ chars V.! (x + y*cols)
 
 
-input :: Grid
+example1 :: [[Char]]
+example1 =
+  [ "########################"
+  , "#f.D.E.e.C.b.A.@.a.B.c.#"
+  , "######################.#"
+  , "#d.....................#"
+  , "########################"
+  ]
+
+
+
+example2 :: [[Char]]
+example2 =
+  [ "#################"
+  , "#i.G..c...e..H.p#"
+  , "########.########"
+  , "#j.A..b...f..D.o#"
+  , "########@########"
+  , "#k.E..a...g..B.n#"
+  , "########.########"
+  , "#l.F..d...h..C.m#"
+  , "#################"
+  ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+input :: [[Char]]
 input =
   [ "#################################################################################"
   , "#.......#...#...#...........#.....#...#.#.....#m......#.......#.....#........u..#"
