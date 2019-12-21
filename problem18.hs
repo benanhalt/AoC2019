@@ -58,7 +58,7 @@ main =
     s = State {pos = botPos, keys = S.empty, steps=0}
     q =  s `snoc` empty
   in
-    print $ search grid allKeys q S.empty
+    print $ search grid allKeys q (rememberState s S.empty)
 
 
 parseGrid :: [[Char]] -> Grid
@@ -69,24 +69,27 @@ parseGrid cs =
   in
     Grid {rows = rows, cols = cols, chars = V.concat $ V.fromList <$> cs}
 
+rememberState :: State -> S.Set (Pos, S.Set Char) -> S.Set (Pos, S.Set Char)
+rememberState State {pos, keys} seen = S.insert (pos, keys) seen
 
-search :: Grid -> S.Set Char -> Queue State -> S.Set (Pos, S.Set Char) -> State
+search :: Grid -> S.Set Char -> Queue State -> S.Set (Pos, S.Set Char) -> Int
 search grid allKeys q seen =
   let
     s@State {keys, pos, steps} = front q
     Just c = look grid pos
     keys' = if isLower c then S.insert c keys else keys
-    seen' = S.insert (pos, keys') seen
     newStates = do
       let Pos (x,y) = pos
       pos' <- [(x-1, y), (x, y-1), (x+1, y), (x, y+1)]
-      guard $ not $ S.member (Pos pos', keys') seen'
+      guard $ not $ S.member (Pos pos', keys') seen
       let s' = State {pos = Pos pos', keys=keys', steps=steps+1}
       guard $ isGood grid s'
       pure s'
     q' = foldl' (flip snoc) (rest q) newStates
+    seen' = foldl' (flip rememberState) seen newStates
   in
-    if keys' == allKeys then s
+    (if (S.size seen') `mod` 1000 == 0 then traceShow (S.size seen', s) else id) $
+    if keys' == allKeys then steps
     else search grid allKeys q' seen'
 
 
@@ -146,59 +149,6 @@ example2 =
   , "#l.F..d...h..C.m#"
   , "#################"
   ]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
