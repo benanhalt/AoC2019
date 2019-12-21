@@ -4,13 +4,45 @@ import Prelude hiding (Left, Right)
 import Control.Monad (forM_, guard)
 import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt, intercalate)
 import Data.Maybe (fromMaybe, isNothing, listToMaybe)
-import Data.Char (chr, ord)
+import Data.Char (chr, ord, toUpper)
 import qualified Data.Map.Strict as Map
 import Control.Concurrent (threadDelay)
 
 
+data InReg = A | B | C | D | T | J deriving (Show, Eq)
+data OutReg = To | Jo deriving (Show, Eq)
+
+data Inst
+  = Not InReg OutReg
+  | And InReg OutReg
+  | Or InReg OutReg
+  deriving (Show, Eq)
+
+
+encodeInst :: Inst -> String
+encodeInst = init . fmap toUpper . show
+
+encodeProg :: [Inst] -> String
+encodeProg = unlines . (<> ["WALK"]) . (encodeInst <$>)
+
 main :: IO ()
-main = putStrLn $ fmap (chr.fromInteger) $ getOutput $ execState $ state0 program []
+main =
+  let
+    script =
+      [ "NOT B T"
+      , "AND A T"
+      , "NOT A J"
+      , "OR J T"
+      , "AND C T"
+      , "NOT C J"
+      , "OR T J"
+      , "AND D J"
+      , "WALK"
+      ]
+
+    input = fmap (toInteger . ord) $ unlines script
+  in
+    putStrLn $ fmap (chr . fromInteger) $ getOutput $ execState $ state0 program input
 
 
 type Mem = Map.Map Integer Integer
