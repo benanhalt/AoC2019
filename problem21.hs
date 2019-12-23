@@ -9,40 +9,42 @@ import qualified Data.Map.Strict as Map
 import Control.Concurrent (threadDelay)
 
 
-data InReg = A | B | C | D | T | J deriving (Show, Eq)
-data OutReg = To | Jo deriving (Show, Eq)
-
-data Inst
-  = Not InReg OutReg
-  | And InReg OutReg
-  | Or InReg OutReg
-  deriving (Show, Eq)
-
-
-encodeInst :: Inst -> String
-encodeInst = init . fmap toUpper . show
-
-encodeProg :: [Inst] -> String
-encodeProg = unlines . (<> ["WALK"]) . (encodeInst <$>)
-
 main :: IO ()
 main =
   let
-    script =
-      [ "NOT B T"
-      , "AND A T"
-      , "NOT A J"
-      , "OR J T"
-      , "AND C T"
-      , "NOT C J"
-      , "OR T J"
+    script1 =
+      [ "NOT C J"
       , "AND D J"
-      , "WALK"
+      , "NOT H T"
+      , "NOT T T"
+      , "OR E T"
+      , "AND T J"
+      , "NOT A T"
+      , "OR T J"
+      , "NOT B T"
+      , "NOT T T"
+      , "OR E T"
+      , "NOT T T"
+      , "OR T J"
+      , "RUN"
       ]
 
-    input = fmap (toInteger . ord) $ unlines script
-  in
-    putStrLn $ fmap (chr . fromInteger) $ getOutput $ execState $ state0 program input
+    script0 =
+      ["NOT A J"
+      ,"NOT B T"
+      ,"AND D T"
+      ,"OR T J"
+      ,"NOT C T"
+      ,"OR T J"
+      ,"AND D J"
+      ,"WALK"
+      ]
+
+    input0 = fmap (toInteger . ord) $ unlines script0
+    input1 = fmap (toInteger . ord) $ unlines script1
+  in do
+    print $ last $ getOutput $ execState $ state0 program input0
+    print $ last $ getOutput $ execState $ state0 program input1
 
 
 type Mem = Map.Map Integer Integer
