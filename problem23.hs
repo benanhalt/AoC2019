@@ -2,6 +2,7 @@
 
 import Prelude hiding (Left, Right)
 import Control.Monad (forM_, guard)
+import Control.Applicative ((<|>))
 import Data.List (permutations, sortOn, foldl', nub, unfoldr, splitAt, find, isPrefixOf, iterate')
 import Data.Maybe (fromMaybe, isNothing, listToMaybe)
 import Data.Char (chr, ord, toUpper)
@@ -13,21 +14,37 @@ import Debug.Trace
 main :: IO ()
 main =
   let
-    (a, b) = span ((== Nothing) . (find ([255] `isPrefixOf`)) . (fmap getOutput)) $ iterate' stepNics nics
+    states = take 200 $ iterate' stepNetwork network0
   in
-    print $ getOutput <$> head b
+    forM_ states (print . nat)
 
-nics :: [State]
-nics = (\i -> state0 program [i]) <$> [0..49]
 
-stepNics :: [State] -> [State]
-stepNics nics =
+data Network = Network
+  { nics :: [State]
+  , nat :: Maybe (Integer, Integer)
+  }
+
+network0 :: Network
+network0 = Network {nics = (\i -> state0 program [i]) <$> [0..49], nat = Nothing}
+
+stepNetwork :: Network -> Network
+stepNetwork network@Network{nics, nat} =
   let
     nics' = execState <$> clearOutput <$> nics
     outputs = concat $ (chunk 3 . getOutput) <$> nics'
+    nat' = (listToMaybe $ reverse $ (\[_, x, y] -> (x, y)) <$> filter ([255] `isPrefixOf`) outputs)
+      <|> nat
   in
-    sendPackets outputs nics'
+    handleNat $ network {nics = sendPackets outputs nics', nat = nat'}
 
+handleNat :: Network -> Network
+handleNat network@Network{nics, nat} =
+  case nat of
+    Just (x, y) | isIdle network -> network {nics = sendPackets [[0, x, y]] nics, nat = Nothing}
+    _ -> network
+
+isIdle :: Network -> Bool
+isIdle Network{nics} = (all null $ getOutput <$> nics) && (all (== [-1]) $ inputs <$> nics)
 
 chunk :: Int -> [a] -> [[a]]
 chunk n = takeWhile (not . null) . unfoldr (Just . splitAt n)
