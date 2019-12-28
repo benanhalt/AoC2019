@@ -49,14 +49,19 @@ cheat1 states@(s:_) = do
     [] -> do
       putStrLn "Couldn't get through!"
       main' states
-    (s':_) -> main' (s':states)
+    ((itemsUsed, state):others) -> do
+      putStrLn "Got through with:"
+      print itemsUsed
+      putStrLn "Other solutions:"
+      forM_ (fmap fst others) print
+      main' (state:states)
 
-tryInv :: String -> [String] -> State -> [State]
+tryInv :: String -> [String] -> State -> [([String], State)]
 tryInv dir items state = do
   subs <- subsequences items
   let try = sndCmd dir $ foldl' (\s i -> sndCmd ("take " ++ i) s) state subs
   guard $ not $ "ejected" `isInfixOf` getOutp try
-  pure try
+  pure (subs, try)
 
 save :: [State] -> IO ()
 save states = do
